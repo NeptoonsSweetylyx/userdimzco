@@ -58,7 +58,7 @@ async def main():
 def is_device_owner(sender_id):
     return sender_id == device_owner_id
 
-@client.on(events.NewMessage(pattern='/promote', outgoing=True))
+@client.on(events.NewMessage(pattern='/p', outgoing=True))
 async def promote(event):
     sender = await event.get_sender()
     if not is_device_owner(sender.id):
@@ -66,40 +66,20 @@ async def promote(event):
         print("Unauthorized access attempt blocked.")
         return
 
-    args = event.raw_text.split()[1:]
-    if len(args) != 2:
-        await event.respond(append_watermark_to_message("❌ Format yang benar: /promote <interval_menit> <durasi_hari>"))
-        return
-
-    try:
-        interval_minutes = int(args[0].replace("menit", ""))
-        duration_days = int(args[1].replace("hari", ""))
-    except ValueError:
-        await event.respond(append_watermark_to_message("❌ Interval dan durasi harus berupa angka."))
-        return
-
     reply_message = await event.get_reply_message()
     if not reply_message:
         await event.respond(append_watermark_to_message("❌ Silakan membalas pesan, gambar, atau video untuk digunakan sebagai konten jaseb"))
         return
-
-    end_time = datetime.datetime.now() + datetime.timedelta(days=duration_days)
-
-    async def promote_loop():
-        while datetime.datetime.now() < end_time:
-            await send_promote_message(event, reply_message)
-            await asyncio.sleep(interval_minutes * 60)
-
-    asyncio.create_task(promote_loop())
-    await event.respond(append_watermark_to_message(f"✅ Promote dimulai. Akan berjalan setiap {interval_minutes} menit selama {duration_days} hari."))
-
-async def send_promote_message(event, reply_message):
+    
     sent_count = 0
     failed_count = 0
+    delay = 1 # Set your desired delay time in seconds
     status_message = await event.respond(append_watermark_to_message("🔎 Memulai Jaseb..."))
 
     groups = [dialog for dialog in await client.get_dialogs() if dialog.is_group]
     total_groups = len(groups)
+
+    loading_symbols = [".", "..", "...", "...."]
 
     for dialog in groups:
         if dialog.id in blacklisted_groups:
@@ -107,29 +87,22 @@ async def send_promote_message(event, reply_message):
         try:
             if reply_message.media:
                 media_path = await client.download_media(reply_message.media)
-                formatted_message = format_message(reply_message.message)
-                await client.send_file(dialog.id, media_path, caption=append_watermark_to_message(formatted_message))
+                await client.send_file(dialog.id, media_path, caption=append_watermark_to_message(reply_message.message))
             else:
-                formatted_message = format_message(reply_message.message)
-                message_with_watermark = append_watermark_to_message(formatted_message)
-                await client.send_message(dialog.id, message_with_watermark, parse_mode='html')
+                message_with_watermark = append_watermark_to_message(reply_message.message)
+                await client.send_message(dialog.id, message_with_watermark)
             sent_count += 1
             progress = (sent_count / total_groups) * 100
             
-            await status_message.edit(append_watermark_to_message(f"🔎 Mengirim jaseb ke grup... {progress:.2f}%\n\n✔️ Terkirim: {sent_count}\n❌ Gagal: {failed_count}"))
+            for remaining_time in range(delay, 0, -1):
+                loading_animation = "".join([symbol for symbol in loading_symbols[:sent_count % len(loading_symbols) + 1]])
+                await status_message.edit(append_watermark_to_message(f"🔎 Mengirim jaseb ke grup{loading_animation} {progress:.2f}%\n\n✔️ Terkirim: {sent_count}\n❌ Gagal: {failed_count}\n⏭ Grup selanjutnya {remaining_time} detik lagi..."))
+                await asyncio.sleep(1)
         except Exception as e:
             failed_count += 1
             print(f"Failed to send to {dialog.title}: {e}")
     
     await status_message.edit(append_watermark_to_message(f"✅ Selesai mengirim jaseb ke semua grup!\n\nTotal grup terkirim: {sent_count}\nTotal grup yang gagal: {failed_count}"))
-
-def format_message(message):
-    formatted = message
-    formatted = formatted.replace('**', '<b>').replace('**', '</b>')  # Bold
-    formatted = formatted.replace('__', '<i>').replace('__', '</i>')  # Italic
-    formatted = formatted.replace('--', '<u>').replace('--', '</u>')  # Underline
-    formatted = formatted.replace('``', '<code>').replace('``', '</code>')  # Monospace
-    return formatted
 
 @client.on(events.NewMessage(pattern='/blacklist', outgoing=True))
 async def blacklist_group(event):
@@ -211,7 +184,7 @@ async def back(event):
 async def show_help(event):
     help_text = (
         "🛠 **Perintah yang Tersedia:**\n"
-        "/promote - Promosikan pesan ke semua grup.\n"
+        "/p - Promosikan pesan ke semua grup.\n"
         "/blacklist - Daftar hitamkan grup saat ini agar tidak menerima promosi.\n"
         "/addqr - Tambahkan kode QR (kirim gambar sebagai balasan atas perintah ini).\n"
         "/getqr - Ambil semua kode QR yang disimpan.\n"
