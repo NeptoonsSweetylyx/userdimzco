@@ -1,16 +1,17 @@
 from telethon import TelegramClient, events
 import os
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from telethon.errors import FloodWaitError
 from telethon.tl import functions
 import time
 
 DEL_TIME_OUT = 60
 DEFAULTUSER = "Own"
+handled_user = set()
 
-api_id = '29798494'
-api_hash = '53273c1de3e68a9ecdb90de2dcf46f6c'
+api_id = '26102063'
+api_hash = 'ac836bfc1fe0247cc215dd17714ba339'
 
 client = TelegramClient('userbot', api_id, api_hash)
 device_owner_id = None
@@ -132,9 +133,11 @@ async def promote(event):
             if reply_message.media:
                 media_path = await client.download_media(reply_message.media)
                 await client.send_file(dialog.id, media_path, caption=append_watermark_to_message(reply_message.message, parse_mode='html'))
+                print(f"Pesan Jaseb Berhasil Dikirim Ke Grup")
             else:
                 message_with_watermark = append_watermark_to_message(reply_message.message)
                 await client.send_message(dialog.id, message_with_watermark, parse_mode='html')
+                print(f"Pesan Jaseb Berhasil Dikirim Ke Grup")
             sent_count += 1
             progress = (sent_count / total_groups) * 100
             
@@ -202,7 +205,7 @@ async def get_qr(event):
         await event.respond(append_watermark_to_message("❌ Gagal menambahkan QR Code."))
         print(f"Error sending QR code: {e}")
 
-@client.on(events.NewMessage(pattern='/afk', outgoing=True))
+@client.on(events.NewMessage(pattern='/afk', from_users='me'))
 async def afk(event):
     global afk_reason
     afk_reason = event.message.message[len('/afk '):].strip()
@@ -214,7 +217,11 @@ async def afk(event):
 @client.on(events.NewMessage(incoming=True))
 async def handle_incoming(event):
     global afk_reason
-    if afk_reason and (event.mentioned or event.is_private):
+    sender = await event.get_sender()
+    tgln = datetime.now().date()
+    anu = f'{sender.id}-{tgln}'
+    if afk_reason and anu not in handled_user:
+        handled_user.add(anu)
         await event.reply(append_watermark_to_message(f"{afk_reason}"))
 
 @client.on(events.NewMessage(pattern='/back', outgoing=True))
