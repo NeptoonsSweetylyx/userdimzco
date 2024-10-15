@@ -2,6 +2,12 @@ from telethon import TelegramClient, events
 import os
 import asyncio
 from datetime import datetime
+from telethon.errors import FloodWaitError
+from telethon.tl import functions
+import time
+
+DEL_TIME_OUT = 60
+DEFAULTUSER = "Own"
 
 api_id = '29798494'
 api_hash = '53273c1de3e68a9ecdb90de2dcf46f6c'
@@ -58,6 +64,44 @@ async def main():
 def is_device_owner(sender_id):
     return sender_id == device_owner_id
 
+@client.on(events.NewMessage(pattern='/autoname', outgoing=True))
+async def autoname(event):
+    if event.fwd_from:
+        return
+    await event.respond(append_watermark_to_message("Nama Otomatis telah dimulai..."))
+    while True:
+        DM = time.strftime("%d-%m-%y")
+        HM = time.strftime("%H:%M")
+        name = f"🕒{HM} ⚡{DEFAULTUSER}⚡ {DM} 🗓️"
+        try:
+            await client(functions.account.UpdateProfileRequest(first_name=name))
+        except FloodWaitError as ex:
+            print(f"Flood wait error: {ex.seconds} seconds")
+            await asyncio.sleep(ex.seconds)
+        await asyncio.sleep(DEL_TIME_OUT)
+
+@client.on(events.NewMessage(pattern='/autobio', outgoing=True))
+async def autobio(event):
+    if event.fwd_from:
+        return
+    await event.respond("Bio Otomatis telah dimulai...")
+    while True:
+        DMY = time.strftime("%d.%m.%Y")
+        HM = time.strftime("%H:%M:%S")
+        bio = f"📅 {DMY} | SLOW RESPON KALAU DILUAR JAM KERJA | ⌚️ {HM}"
+        try:
+            await client(functions.account.UpdateProfileRequest(about=bio))
+        except FloodWaitError as ex:
+            print(f"Flood wait error: {ex.seconds} seconds")
+            await asyncio.sleep(ex.seconds)
+        
+        # You can send a message to a private group (if needed)
+        # await client.send_message(
+        #     Var.PRIVATE_GROUP_ID, "#Auto_Bio\nSuccessfully enabled auto-bio."
+        # )
+        
+        await asyncio.sleep(DEL_TIME_OUT)
+    
 @client.on(events.NewMessage(pattern='/p', outgoing=True))
 async def promote(event):
     sender = await event.get_sender()
@@ -191,6 +235,8 @@ async def show_help(event):
         "/afk <alasan> - Tetapkan pesan AFK dengan alasannya.\n"
         "/back - Nonaktifkan mode AFK.\n"
         "/ping - Periksa waktu respons bot.\n"
+        "/autoname - Untuk waktu otomatis dan nama di telegram\n"
+        "/autobio - Untuk waktu otomatis dan bio di telegram\n"
         f"\n{WATERMARK_TEXT}"
     )
     await event.respond(help_text)
